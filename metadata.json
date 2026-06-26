@@ -1,0 +1,6 @@
+{
+  "name": "AI Resume Roaster",
+  "description": "Improve your resume with professional ATS and HR scores, a brutal or friendly resume roast, a cover letter generator, custom interview preparation, and step-by-step career roadmaps.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
