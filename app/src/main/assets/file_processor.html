@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>JS File Processor Service</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script>
+    // Configure pdf.js worker URL to load from CDN
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  </script>
+</head>
+<body>
+  <h3>JS File Processor Service Running</h3>
+  <script>
+    console.log("File Processor HTML loaded");
+
+    async function processFile(base64Data, fileType) {
+      console.log("Processing file of type: " + fileType);
+      try {
+        // Convert base64 string to ArrayBuffer
+        const binaryString = window.atob(base64Data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const arrayBuffer = bytes.buffer;
+
+        let rawText = "";
+        let pageCount = 1;
+
+        if (fileType === "pdf") {
+          console.log("Parsing PDF with pdf.js...");
+          const loadingTask = pdfjsLib.getDocument({data: arrayBuffer});
+          const pdf = await loadingTask.promise;
+          pageCount = pdf.numPages;
+          console.log("PDF parsed successfully, page count: " + pageCount);
+          
+          let fullText = "";
+          for (let i = 1; i <= pageCount; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(" ");
+            fullText += pageText + "\n";
+          }
+          rawText = fullText;
+        } else if (fileType === "docx") {
+          console.log("Parsing DOCX with mammoth.js...");
+          const result = await mammoth.extractRawText({arrayBuffer: arrayBuffer});
+          rawText = result.value;
+          console.log("DOCX parsed successfully using mammoth.js");
+        } else {
+          console.log("Parsing file as plain text...");
+          const decoder = new TextDecoder("utf-8");
+          rawText = decoder.decode(bytes);
+        }
+
+        // Sanitize extracted text for high quality Gemini API consumption
+        const sanitizedText = sanitizeText(rawText);
+        console.log("Text sanitized, length: " + sanitizedText.length);
+
+        // Send back successful results
+        if (window.AndroidInterface) {
+          window.AndroidInterface.onExtractionSuccess(sanitizedText, pageCount);
+        } else {
+          console.error("AndroidInterface is not available");
+        }
+      } catch (error) {
+        console.error("Extraction error: ", error);
+        if (window.AndroidInterface) {
+          window.AndroidInterface.onExtractionFailure(error.toString());
+        }
+      }
+    }
+
+    /**
+     * Sanitizes extracted raw text so it is ultra-clean for Gemini LLM consumption:
+     * - Standardizes lines, spacing, and carriage returns
+     * - Safely filters garbled PDF characters or control characters
+     * - Minimizes token overhead by trimming empty vertical space and duplicate tabs/spaces
+     */
+    function sanitizeText(text) {
+      if (!text) return "";
+      
+      // Remove bad control characters except newline and tab
+      let cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, "");
+
+      // Convert all vertical whitespace variations (CRLF, CR) to standard LF (\n)
+      cleaned = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+      // Replace excessive blank lines (3 or more) with exactly two to save tokens and maintain section layout
+      cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+
+      // Replace vertical tab or page break characters with standard linebreaks
+      cleaned = cleaned.replace(/\x0C/g, "\n");
+
+      // Process line-by-line to trim spaces on line ends to avoid unnecessary token inflation
+      cleaned = cleaned.split("\n")
+        .map(line => line.trimEnd())
+        .join("\n");
+
+      // Replace horizontal tab and multiple spaces with a single space
+      cleaned = cleaned.replace(/[ \t]{2,}/g, " ");
+
+      // Final outer trim to clean up empty start/end space
+      return cleaned.trim();
+    }
+  </script>
+</body>
+</html>
