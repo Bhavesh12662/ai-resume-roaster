@@ -17,10 +17,43 @@ import org.json.JSONObject
 
 class ResumeRoasterViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: ResumeAnalysisRepository
+    private val profileRepository: ProfileAndCareerRepository
+
+    val userProfile: StateFlow<UserProfileEntity?>
+    val jobApplications: StateFlow<List<JobApplicationEntity>>
 
     init {
         val database = AppDatabase.getDatabase(application)
         repository = ResumeAnalysisRepository(database.resumeAnalysisDao())
+        profileRepository = ProfileAndCareerRepository(database.profileAndCareerDao())
+
+        userProfile = profileRepository.userProfile
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = null
+            )
+
+        jobApplications = profileRepository.allJobApplications
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+
+        // Pre-populate with beautiful default data on first app launch
+        viewModelScope.launch {
+            profileRepository.userProfile.take(1).collect { current ->
+                if (current == null) {
+                    profileRepository.insertProfile(UserProfileEntity())
+                    // Pre-populate some dummy job applications as well for a richer visual dashboard
+                    profileRepository.insertJobApplication(JobApplicationEntity(companyName = "Google", jobTitle = "Senior Android Developer", location = "Mountain View, CA", appliedDate = "2026-06-20", status = "Interview Scheduled"))
+                    profileRepository.insertJobApplication(JobApplicationEntity(companyName = "Meta", jobTitle = "UI Engineer", location = "Menlo Park, CA", appliedDate = "2026-06-15", status = "Technical Round"))
+                    profileRepository.insertJobApplication(JobApplicationEntity(companyName = "Stripe", jobTitle = "Full Stack Engineer", location = "Remote", appliedDate = "2026-06-10", status = "Offer Received"))
+                    profileRepository.insertJobApplication(JobApplicationEntity(companyName = "Netflix", jobTitle = "Mobile Core Architect", location = "Los Gatos, CA", appliedDate = "2026-06-05", status = "HR Round"))
+                }
+            }
+        }
     }
 
     // UI Input State
@@ -646,6 +679,66 @@ class ResumeRoasterViewModel(application: Application) : AndroidViewModel(applic
                 marketContext = "Calculated for an Associate Engineer level. Adding cloud deployment skills or full stack metrics can raise this range by 15-20%."
             )
         )
+    }
+
+    // --- User Profile Actions ---
+    fun saveUserProfile(profile: UserProfileEntity) {
+        viewModelScope.launch {
+            profileRepository.insertProfile(profile)
+        }
+    }
+
+    fun resetUserProfileToDefault() {
+        viewModelScope.launch {
+            profileRepository.insertProfile(UserProfileEntity())
+        }
+    }
+
+    fun deleteProfileHistory() {
+        viewModelScope.launch {
+            repository.clearAll()
+        }
+    }
+
+    fun deleteUserProfilePermanently() {
+        viewModelScope.launch {
+            profileRepository.insertProfile(UserProfileEntity(fullName = "", username = "", email = "", phone = "", currentJobTitle = "", experienceLevel = "", education = "", university = "", graduationYear = "", careerGoal = "", preferredJobRole = "", skills = "", programmingLanguages = "", frameworks = "", tools = "", certifications = "", languagesKnown = "", currentCompany = "", portfolioWebsite = "", linkedinProfile = "", githubProfile = "", leetcodeProfile = "", hackerrankProfile = ""))
+            profileRepository.clearAllJobApplications()
+            repository.clearAll()
+        }
+    }
+
+    // --- Job Application Tracker Actions ---
+    fun addJobApplication(company: String, title: String, location: String, date: String, status: String) {
+        viewModelScope.launch {
+            profileRepository.insertJobApplication(
+                JobApplicationEntity(
+                    companyName = company,
+                    jobTitle = title,
+                    location = location,
+                    appliedDate = date,
+                    status = status
+                )
+            )
+        }
+    }
+
+    fun updateJobApplicationStatus(app: JobApplicationEntity, newStatus: String) {
+        viewModelScope.launch {
+            profileRepository.insertJobApplication(app.copy(status = newStatus))
+        }
+    }
+
+    fun deleteJobApplication(app: JobApplicationEntity) {
+        viewModelScope.launch {
+            profileRepository.deleteJobApplication(app)
+        }
+    }
+
+    fun clearJobApplications() {
+        viewModelScope.launch {
+            profileRepository.clearAllJobApplications()
+        }
     }
 }
 

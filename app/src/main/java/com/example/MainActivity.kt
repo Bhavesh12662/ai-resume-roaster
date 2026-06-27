@@ -32,6 +32,7 @@ enum class AppTab(
     DASHBOARD("dashboard", "Roast & Scores", Icons.Filled.Analytics, Icons.Outlined.Analytics),
     TOOLS("tools", "AI Tools", Icons.Filled.Build, Icons.Outlined.Build),
     HISTORY("history", "History", Icons.Filled.History, Icons.Outlined.History),
+    PROFILE("profile", "Profile", Icons.Filled.Person, Icons.Outlined.Person),
     ADMIN("admin", "Stats", Icons.Filled.Leaderboard, Icons.Outlined.Leaderboard)
 }
 
@@ -68,8 +69,9 @@ class MainActivity : ComponentActivity() {
                                     label = {
                                         Text(
                                             text = tab.title,
-                                            fontSize = 10.sp,
-                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium
+                                            fontSize = 9.sp,
+                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                            maxLines = 1
                                         )
                                     }
                                 )
@@ -94,6 +96,10 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel
                             )
                             AppTab.HISTORY -> HistoryScreen(
+                                viewModel = viewModel,
+                                onNavigateToDashboard = { currentTab = AppTab.DASHBOARD }
+                            )
+                            AppTab.PROFILE -> ProfileScreen(
                                 viewModel = viewModel,
                                 onNavigateToDashboard = { currentTab = AppTab.DASHBOARD }
                             )

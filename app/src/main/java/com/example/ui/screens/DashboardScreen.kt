@@ -38,6 +38,7 @@ import com.example.ui.theme.ToneFriendly
 import com.example.ui.theme.ToneProfessional
 import com.example.ui.theme.ToneSavage
 import com.example.ui.viewmodel.ResumeRoasterViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun DashboardScreen(
@@ -53,6 +54,11 @@ fun DashboardScreen(
 
     // Local state for tabs
     var selectedTab by remember { mutableStateOf(0) }
+
+    val scope = rememberCoroutineScope()
+    var isExporting by remember { mutableStateOf(false) }
+    var enablePrivacyGuard by remember { mutableStateOf(true) }
+    val uploadedFileName by viewModel.uploadedFileName.collectAsStateWithLifecycle()
 
     Box(
         modifier = modifier
@@ -200,6 +206,211 @@ fun DashboardScreen(
                             ScoreItemColumn(title = "HR Score", score = analysis.hrScore, icon = Icons.Default.Groups)
                             ScoreItemColumn(title = "Readability", score = analysis.readabilityScore, icon = Icons.Default.MenuBook)
                             ScoreItemColumn(title = "Grammar", score = analysis.grammarScore, icon = Icons.Default.Spellcheck)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // PDF Export & Privacy Guard Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("pdf_export_card"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = "PDF EXPORT & PRIVACY GUARD",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Compile and download your complete AI feedback, scores, and savage coach comments into a beautifully formatted PDF report. Secure on-device compiler.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Privacy Guard Option
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (enablePrivacyGuard) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                    else MaterialTheme.colorScheme.surface,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (enablePrivacyGuard) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                    else MaterialTheme.colorScheme.outlineVariant,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { enablePrivacyGuard = !enablePrivacyGuard }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = if (enablePrivacyGuard) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Enable Privacy Guard",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (enablePrivacyGuard) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Redacts contact credentials & file name in exported report",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = enablePrivacyGuard,
+                                onCheckedChange = { enablePrivacyGuard = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Action Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        isExporting = true
+                                        try {
+                                            val jsonStr = analysis.toJsonString()
+                                            val finalFileName = uploadedFileName ?: "resume_roaster_report"
+                                            val pdfBytes = com.example.util.JsPdfGenerator.generatePdf(
+                                                context = context,
+                                                jsonStr = jsonStr,
+                                                tone = tone,
+                                                focusMode = focusMode,
+                                                applyPrivacy = enablePrivacyGuard,
+                                                fileName = finalFileName
+                                            )
+                                            com.example.util.FileExportUtils.savePdfToDownloads(context, pdfBytes, "AI_Resume_Report_$finalFileName")
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                            Toast.makeText(context, "Save failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                        } finally {
+                                            isExporting = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isExporting,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                if (isExporting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
+                                        Text("Save to Device", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        isExporting = true
+                                        try {
+                                            val jsonStr = analysis.toJsonString()
+                                            val finalFileName = uploadedFileName ?: "resume_roaster_report"
+                                            val pdfBytes = com.example.util.JsPdfGenerator.generatePdf(
+                                                context = context,
+                                                jsonStr = jsonStr,
+                                                tone = tone,
+                                                focusMode = focusMode,
+                                                applyPrivacy = enablePrivacyGuard,
+                                                fileName = finalFileName
+                                            )
+                                            com.example.util.FileExportUtils.sharePdf(context, pdfBytes, "AI_Resume_Report_$finalFileName")
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                            Toast.makeText(context, "Share failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                        } finally {
+                                            isExporting = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isExporting
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
+                                    Text("Share PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        // Local compilation notice
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🔒 100% Secure & Private: PDFs are compiled locally using client-side jsPDF.",
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }

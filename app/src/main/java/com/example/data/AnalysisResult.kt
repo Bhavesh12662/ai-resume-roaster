@@ -23,6 +23,89 @@ data class AnalysisResult(
     val skillGapAnalysis: List<SkillGap> = emptyList(),
     val salaryEstimation: SalaryEstimation = SalaryEstimation()
 ) {
+    fun toJsonString(): String {
+        val json = JSONObject()
+        json.put("overallScore", overallScore)
+        json.put("atsScore", atsScore)
+        json.put("hrScore", hrScore)
+        json.put("keywordMatch", keywordMatch)
+        json.put("grammarScore", grammarScore)
+        json.put("formattingScore", formattingScore)
+        json.put("readabilityScore", readabilityScore)
+        json.put("roast", roast)
+        json.put("atsFeedback", atsFeedback)
+        json.put("hrFeedback", hrFeedback)
+
+        val grammarArr = JSONArray()
+        grammarIssues.forEach { issue ->
+            val obj = JSONObject()
+            obj.put("original", issue.original)
+            obj.put("suggestion", issue.suggestion)
+            obj.put("explanation", issue.explanation)
+            grammarArr.put(obj)
+        }
+        json.put("grammarIssues", grammarArr)
+
+        val impactArr = JSONArray()
+        impactUpdates.forEach { update ->
+            val obj = JSONObject()
+            obj.put("original", update.original)
+            obj.put("replacement", update.replacement)
+            impactArr.put(obj)
+        }
+        json.put("impactUpdates", impactArr)
+
+        val sectionArr = JSONArray()
+        sectionAnalysis.forEach { sec ->
+            val obj = JSONObject()
+            obj.put("sectionName", sec.sectionName)
+            obj.put("status", sec.status)
+            obj.put("recommendation", sec.recommendation)
+            sectionArr.put(obj)
+        }
+        json.put("sectionAnalysis", sectionArr)
+
+        val contactArr = JSONArray()
+        contactIssues.forEach { contact ->
+            val obj = JSONObject()
+            obj.put("item", contact.item)
+            obj.put("status", contact.status)
+            obj.put("recommendation", contact.recommendation)
+            contactArr.put(obj)
+        }
+        json.put("contactIssues", contactArr)
+
+        developerMetrics?.let { dev ->
+            val devObj = JSONObject()
+            devObj.put("githubScore", dev.githubScore)
+            devObj.put("projectsScore", dev.projectsScore)
+            devObj.put("techStackMatch", dev.techStackMatch)
+            devObj.put("feedback", dev.feedback)
+            json.put("developerMetrics", devObj)
+        }
+
+        val gapArr = JSONArray()
+        skillGapAnalysis.forEach { gap ->
+            val obj = JSONObject()
+            obj.put("role", gap.role)
+            val skillsArr = JSONArray()
+            gap.missingSkills.forEach { skillsArr.put(it) }
+            obj.put("missingSkills", skillsArr)
+            obj.put("recommendation", gap.recommendation)
+            gapArr.put(obj)
+        }
+        json.put("skillGapAnalysis", gapArr)
+
+        val salObj = JSONObject()
+        salObj.put("rangeMin", salaryEstimation.rangeMin)
+        salObj.put("rangeMax", salaryEstimation.rangeMax)
+        salObj.put("currency", salaryEstimation.currency)
+        salObj.put("marketContext", salaryEstimation.marketContext)
+        json.put("salaryEstimation", salObj)
+
+        return json.toString()
+    }
+
     companion object {
         fun fromJson(jsonStr: String): AnalysisResult {
             try {

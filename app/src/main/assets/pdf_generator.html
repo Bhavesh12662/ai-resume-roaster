@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>jsPDF Generator Service</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <h3>jsPDF Generator Service Active</h3>
+  <script>
+    console.log("jsPDF HTML Loaded");
+
+    async function generateReportPdf(jsonStr, tone, focusMode, applyPrivacy, fileName) {
+      console.log("Generating PDF for tone: " + tone + " with privacy mode: " + applyPrivacy);
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+          orientation: 'p',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        const data = JSON.parse(jsonStr);
+
+        // Define Page Margins & Dimensions
+        const marginX = 15;
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const contentWidth = pageWidth - (marginX * 2);
+        let y = 20;
+
+        // Color Palette based on selected Tone
+        let primaryColor = [63, 81, 181]; // Professional Purple/Indigo
+        let accentColor = [33, 150, 243]; // Light Blue
+        let toneLabel = "Professional";
+
+        if (tone === "Savage") {
+          primaryColor = [211, 47, 47]; // Savage Red
+          accentColor = [255, 152, 0];  // Savage Orange
+          toneLabel = "Savage Roast";
+        } else if (tone === "Friendly") {
+          primaryColor = [76, 175, 80]; // Friendly Green
+          accentColor = [139, 195, 74]; // Light Green
+          toneLabel = "Friendly Coach";
+        }
+
+        // Helper function for adding pages and running headers/footers
+        function checkPageBreak(neededHeight) {
+          if (y + neededHeight > 275) {
+            drawFooter();
+            doc.addPage();
+            y = 20;
+            drawHeader();
+          }
+        }
+
+        function drawHeader() {
+          // Subtle top page bar
+          doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.rect(0, 0, pageWidth, 4, 'F');
+        }
+
+        function drawFooter() {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(8);
+          doc.setTextColor(150, 150, 150);
+          
+          let privacyText = "Secure Offline Report Generator.";
+          if (applyPrivacy) {
+            privacyText = "Privacy Guard Enabled: Contact & sensitive metadata redacted securely.";
+          }
+          doc.text(privacyText, marginX, pageHeight - 10);
+          doc.text("Page " + doc.internal.getNumberOfPages(), pageWidth - marginX - 15, pageHeight - 10);
+        }
+
+        // --- FIRST PAGE INITIAL DESIGN ---
+        drawHeader();
+
+        // 1. Big Report Hero Header Band
+        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.rect(marginX, y, contentWidth, 24, 'F');
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor(255, 255, 255);
+        doc.text("AI RESUME EVALUATION REPORT", marginX + 8, y + 10);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text("Tone Strategy: " + toneLabel + " | Focus: " + focusMode, marginX + 8, y + 18);
+        
+        y += 32;
+
+        // 2. Metadata Block (Date, Target File, Privacy Notice)
+        doc.setFillColor(245, 247, 250);
+        doc.roundedRect(marginX, y, contentWidth, 20, 3, 3, 'F');
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+        doc.text("Target Document:", marginX + 6, y + 8);
+        doc.text("Analysis Date:", marginX + 6, y + 14);
+        
+        doc.setFont("helvetica", "normal");
+        const cleanFileName = applyPrivacy ? "[REDACTED_RESUME_FILE].pdf" : (fileName || "resume_document.pdf");
+        doc.text(cleanFileName, marginX + 38, y + 8);
+        doc.text(new Date().toLocaleString(), marginX + 38, y + 14);
+
+        // Privacy indicator badge
+        if (applyPrivacy) {
+          doc.setFillColor(76, 175, 80);
+          doc.roundedRect(pageWidth - marginX - 45, y + 4, 39, 12, 2, 2, 'F');
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8);
+          doc.setTextColor(255, 255, 255);
+          doc.text("🔒 PRIVACY ACTIVE", pageWidth - marginX - 42, y + 11);
+        } else {
+          doc.setFillColor(180, 180, 180);
+          doc.roundedRect(pageWidth - marginX - 42, y + 4, 36, 12, 2, 2, 'F');
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8);
+          doc.setTextColor(255, 255, 255);
+          doc.text("🔓 STANDARD EXP", pageWidth - marginX - 39, y + 11);
+        }
+
+        y += 28;
+
+        // 3. SCORE OVERVIEW GRID
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("Core Quality Scores", marginX, y);
+        y += 6;
+
+        // Overall Score Highlight Box
+        const mainCardW = 45;
+        const gridCardW = (contentWidth - mainCardW - 6) / 4;
+
+        // Draw Overall Card
+        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.roundedRect(marginX, y, mainCardW, 30, 3, 3, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.text("OVERALL SCORE", marginX + 4, y + 8);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(26);
+        doc.text(data.overallScore + "/100", marginX + 4, y + 22);
+
+        // Draw Sub Score cards
+        const subScores = [
+          { name: "ATS Match", score: data.atsScore },
+          { name: "HR Score", score: data.hrScore },
+          { name: "Readability", score: data.readabilityScore },
+          { name: "Grammar", score: data.grammarScore }
+        ];
+
+        subScores.forEach((item, index) => {
+          const cardX = marginX + mainCardW + 6 + (index * (gridCardW + 1.5));
+          doc.setFillColor(240, 243, 246);
+          doc.roundedRect(cardX, y, gridCardW, 30, 2, 2, 'F');
+          
+          doc.setTextColor(80, 80, 80);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.5);
+          doc.text(item.name.toUpperCase(), cardX + 3, y + 8);
+          
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(18);
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.text(item.score + "%", cardX + 3, y + 22);
+        });
+
+        y += 38;
+
+        // 4. ROAST SECTION
+        checkPageBreak(50);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("AI Roast Analysis Commentary", marginX, y);
+        y += 6;
+
+        // Draw Roast card background
+        doc.setFillColor(249, 250, 252);
+        const roastLines = doc.splitTextToSize(data.roast || "No roast available.", contentWidth - 12);
+        const roastCardH = (roastLines.length * 5) + 12;
+        
+        doc.roundedRect(marginX, y, contentWidth, roastCardH, 3, 3, 'F');
+        // Border line for card
+        doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.setLineWidth(0.4);
+        doc.line(marginX, y, marginX, y + roastCardH);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9.5);
+        doc.setTextColor(50, 50, 50);
+        
+        let ry = y + 8;
+        roastLines.forEach(line => {
+          doc.text(line, marginX + 6, ry);
+          ry += 5;
+        });
+
+        y += roastCardH + 10;
+
+        // 5. DETAILED CHECKLISTS
+        checkPageBreak(40);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("ATS Readability & HR Feedback", marginX, y);
+        y += 6;
+
+        // ATS Feedback
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(220, 224, 230);
+        doc.setLineWidth(0.3);
+        
+        const atsLines = doc.splitTextToSize("ATS Feedback: " + (data.atsFeedback || ""), contentWidth - 8);
+        const hrLines = doc.splitTextToSize("HR Recruiter Feedback: " + (data.hrFeedback || ""), contentWidth - 8);
+        
+        const feedbackBlockH = (atsLines.length * 4.5) + (hrLines.length * 4.5) + 16;
+        checkPageBreak(feedbackBlockH);
+
+        doc.setFillColor(245, 247, 250);
+        doc.roundedRect(marginX, y, contentWidth, feedbackBlockH, 2, 2, 'F');
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+
+        let fy = y + 7;
+        atsLines.forEach(line => {
+          doc.text(line, marginX + 4, fy);
+          fy += 4.5;
+        });
+
+        fy += 4; // Space between ATS and HR
+        hrLines.forEach(line => {
+          doc.text(line, marginX + 4, fy);
+          fy += 4.5;
+        });
+
+        y += feedbackBlockH + 10;
+
+        // 6. CONTACT VALIDATIONS (Or redacting them if Privacy is on)
+        checkPageBreak(40);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("Contact Details Checklist", marginX, y);
+        y += 6;
+
+        if (applyPrivacy) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(10);
+          doc.setTextColor(120, 120, 120);
+          doc.text("Personal contact verification results are hidden because Privacy Guard is active.", marginX, y);
+          y += 12;
+        } else {
+          if (data.contactIssues && data.contactIssues.length > 0) {
+            data.contactIssues.forEach(contact => {
+              checkPageBreak(12);
+              // Draw contact row
+              doc.setFillColor(252, 252, 253);
+              doc.rect(marginX, y, contentWidth, 10, 'F');
+              
+              // Status text color
+              let statusColor = [76, 175, 80]; // Green
+              if (contact.status === "Missing") statusColor = [211, 47, 47]; // Red
+              else if (contact.status === "Warning") statusColor = [255, 152, 0]; // Orange
+              
+              doc.setFont("helvetica", "bold");
+              doc.setFontSize(9);
+              doc.setTextColor(50, 50, 50);
+              doc.text(contact.item, marginX + 4, y + 6);
+              
+              doc.setFont("helvetica", "normal");
+              doc.setFontSize(8);
+              doc.setTextColor(100, 100, 100);
+              doc.text(contact.recommendation, marginX + 38, y + 6);
+
+              doc.setFont("helvetica", "bold");
+              doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+              doc.text(contact.status, pageWidth - marginX - 22, y + 6);
+              
+              y += 10;
+            });
+            y += 4;
+          } else {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.text("No contact validation errors discovered.", marginX, y);
+            y += 8;
+          }
+        }
+
+        // 7. COMPREHENSIVE ACTIONABLE REWRITES (Page break guaranteed or checks)
+        checkPageBreak(50);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("Actionable Resume Rewrites & Recommendations", marginX, y);
+        y += 6;
+
+        if (data.impactUpdates && data.impactUpdates.length > 0) {
+          data.impactUpdates.forEach((update, idx) => {
+            const origLines = doc.splitTextToSize("Original: \"" + update.original + "\"", contentWidth - 10);
+            const repLines = doc.splitTextToSize("Recommendation: \"" + update.replacement + "\"", contentWidth - 10);
+            const rowHeight = ((origLines.length + repLines.length) * 4.5) + 8;
+            
+            checkPageBreak(rowHeight);
+
+            // Draw a subtle rounded card for each rewrite
+            doc.setFillColor(247, 249, 252);
+            doc.roundedRect(marginX, y, contentWidth, rowHeight - 2, 2, 2, 'F');
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(8.5);
+            doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+            doc.text("REWRITE SUGGESTION #" + (idx + 1), marginX + 4, y + 5);
+
+            let rowY = y + 10;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8.5);
+            doc.setTextColor(120, 40, 40); // Soft red for original
+            origLines.forEach(line => {
+              doc.text(line, marginX + 4, rowY);
+              rowY += 4.5;
+            });
+
+            doc.setTextColor(40, 110, 40); // Soft green for suggestion
+            repLines.forEach(line => {
+              doc.text(line, marginX + 4, rowY);
+              rowY += 4.5;
+            });
+
+            y += rowHeight;
+          });
+          y += 6;
+        } else {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.text("No specific line-by-line rewrite suggestions. Your bullet points look great!", marginX, y);
+          y += 8;
+        }
+
+        // 8. SECTION INTEGRITY VERIFICATIONS
+        checkPageBreak(40);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("Section Analysis & Integrity", marginX, y);
+        y += 6;
+
+        if (data.sectionAnalysis && data.sectionAnalysis.length > 0) {
+          data.sectionAnalysis.forEach(sec => {
+            checkPageBreak(12);
+            doc.setFillColor(252, 252, 253);
+            doc.rect(marginX, y, contentWidth, 10, 'F');
+            
+            let secColor = [76, 175, 80];
+            if (sec.status === "Missing") secColor = [211, 47, 47];
+            else if (sec.status !== "Pass" && sec.status !== "Valid") secColor = [255, 152, 0];
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(50, 50, 50);
+            doc.text(sec.sectionName, marginX + 4, y + 6);
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text(sec.recommendation, marginX + 38, y + 6);
+
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(secColor[0], secColor[1], secColor[2]);
+            doc.text(sec.status, pageWidth - marginX - 22, y + 6);
+
+            y += 10;
+          });
+          y += 6;
+        } else {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.text("All core sections are integrated properly.", marginX, y);
+          y += 8;
+        }
+
+        // 9. EXTRA: ROLE FOCUS DETAILS (Salary or Developer Metrics)
+        checkPageBreak(40);
+        if (focusMode !== "General Career" && data.developerMetrics) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(13);
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.text("Specialized Developer Analysis", marginX, y);
+          y += 6;
+
+          const dev = data.developerMetrics;
+          checkPageBreak(32);
+
+          doc.setFillColor(245, 247, 252);
+          doc.roundedRect(marginX, y, contentWidth, 26, 2, 2, 'F');
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(50, 50, 50);
+          doc.text("Tech Stack Match: " + (dev.techStackMatch || "N/A"), marginX + 4, y + 6);
+          doc.text("GitHub Profile Score: " + dev.githubScore + "% | Projects Quality: " + dev.projectsScore + "%", marginX + 4, y + 12);
+          
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8.5);
+          doc.setTextColor(80, 80, 80);
+          const devFeedbackLines = doc.splitTextToSize("Feedback: " + (dev.feedback || ""), contentWidth - 10);
+          let dfY = y + 18;
+          devFeedbackLines.forEach(line => {
+            doc.text(line, marginX + 4, dfY);
+            dfY += 4;
+          });
+          y += 32;
+
+        } else if (data.salaryEstimation) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(13);
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.text("Estimated Market Position & Salary Range", marginX, y);
+          y += 6;
+
+          const sal = data.salaryEstimation;
+          checkPageBreak(30);
+
+          doc.setFillColor(245, 247, 252);
+          doc.roundedRect(marginX, y, contentWidth, 24, 2, 2, 'F');
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(11);
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.text("Estimated Range: " + sal.rangeMin + " - " + sal.rangeMax + " " + sal.currency, marginX + 4, y + 7);
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8.5);
+          doc.setTextColor(80, 80, 80);
+          const marketLines = doc.splitTextToSize("Context: " + (sal.marketContext || ""), contentWidth - 10);
+          let mkY = y + 13;
+          marketLines.forEach(line => {
+            doc.text(line, marginX + 4, mkY);
+            mkY += 4;
+          });
+          y += 30;
+        }
+
+        // Draw last page footer
+        drawFooter();
+
+        // Convert generated PDF output to Base64 stream
+        const base64Pdf = doc.output('datauristring').split(',')[1];
+        console.log("PDF generated successfully, output size: " + base64Pdf.length);
+
+        if (window.AndroidPdfInterface) {
+          window.AndroidPdfInterface.onPdfGenerationSuccess(base64Pdf);
+        } else {
+          console.error("AndroidPdfInterface is missing");
+        }
+      } catch (error) {
+        console.error("PDF generation failure: ", error);
+        if (window.AndroidPdfInterface) {
+          window.AndroidPdfInterface.onPdfGenerationFailure(error.toString());
+        }
+      }
+    }
+  </script>
+</body>
+</html>
